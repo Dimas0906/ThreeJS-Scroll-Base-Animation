@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import GUI from "lil-gui";
+import gsap from "gsap";
 
 // texture
 const textureLoader = new THREE.TextureLoader();
@@ -15,10 +16,12 @@ const parameters = {
 
 gui.addColor(parameters, "materialColor").onChange(() => {
   material.color.set(parameters.materialColor);
+  particleMaterial.color.set(parameters.materialColor);
 });
 
 // handling scroll
 let scrollY = window.scrollY;
+let currentSection = 0;
 
 // handling paralax
 const cursor = {};
@@ -36,6 +39,28 @@ window.addEventListener("mousemove", (e) => {
   cursor.y = -(e.clientY / sizes.height - 0.5);
 });
 
+// handling scroll action
+window.addEventListener("scroll", () => {
+  scrollY = window.scrollY;
+  const newSection = Math.min(
+    Math.round(scrollY / sizes.height),
+    sectionMeshes.length - 1
+  );
+
+  if (newSection != currentSection) {
+    currentSection = newSection;
+
+    const currentRotation = sectionMeshes[currentSection].rotation;
+    gsap.to(sectionMeshes[currentSection].rotation, {
+      duration: 1.5,
+      ease: "power2.inOut",
+      x: currentRotation.x + Math.PI * 2,
+      y: currentRotation.y + Math.PI,
+      z: currentRotation.z + Math.PI / 2,
+    });
+  }
+});
+
 // creating group
 const cameraGroup = new THREE.Group();
 
@@ -45,16 +70,6 @@ const canvas = document.querySelector("canvas.webgl");
 // Scene
 const scene = new THREE.Scene();
 scene.add(cameraGroup);
-
-// handling particle
-const particlesCount = 200;
-const positions = new Float32Array(particlesCount * 3);
-
-for (let i = 0; i < particlesCount; i++) {
-  positions[i * 3 + 0] = Math.random();
-  positions[i * 3 + 1] = Math.random();
-  positions[i * 3 + 2] = Math.random();
-}
 
 // create material with toon effect
 // Note : This material need light, so it can be seen on the screen
@@ -90,6 +105,33 @@ mesh2.position.x = -2;
 mesh3.position.x = 2;
 
 scene.add(mesh1, mesh2, mesh3);
+
+// handling particle
+const particlesCount = 200;
+const positions = new Float32Array(particlesCount * 3);
+
+for (let i = 0; i < particlesCount; i++) {
+  positions[i * 3 + 0] = (Math.random() - 0.5) * 10;
+  positions[i * 3 + 1] =
+    objectsDistance * 0.5 -
+    Math.random() * objectsDistance * sectionMeshes.length;
+  positions[i * 3 + 2] = (Math.random() - 0.5) * 10;
+}
+
+// geometry for particle
+const particleGeometry = new THREE.BufferGeometry();
+particleGeometry.setAttribute(
+  "position",
+  new THREE.BufferAttribute(positions, 3)
+);
+const particleMaterial = new THREE.PointsMaterial({
+  color: parameters.materialColor,
+  sizeAttenuation: true,
+  size: 0.03,
+});
+
+const particles = new THREE.Points(particleGeometry, particleMaterial);
+scene.add(particles);
 
 // light
 const directionalLight = new THREE.DirectionalLight("#ffffff", 3);
@@ -150,10 +192,10 @@ const tick = () => {
   const deltaTime = elapsedTime - previousTime;
   previousTime = elapsedTime;
 
-  // loop for all meshes
+  // Continuous rotation for all meshes
   for (const mesh of sectionMeshes) {
-    mesh.rotation.x = elapsedTime * 0.1;
-    mesh.rotation.y = elapsedTime * 0.12;
+    mesh.rotation.x += deltaTime * 0.1;
+    mesh.rotation.y += deltaTime * 0.12;
   }
 
   camera.position.y = (-scrollY / sizes.height) * objectsDistance;
@@ -163,8 +205,6 @@ const tick = () => {
   const paralaxY = cursor.y * 0.5;
   cameraGroup.position.x += (paralaxX - cameraGroup.position.x) * 5 * deltaTime;
   cameraGroup.position.y += (paralaxY - cameraGroup.position.y) * 5 * deltaTime;
-
-  // animate camera
 
   // Render
   renderer.render(scene, camera);
